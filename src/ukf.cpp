@@ -61,12 +61,20 @@ UKF::UKF() {
 
   // time when the state is true?
   time_us_ = 0;
-  Xsig_pred_.setZero();
   // number of arguments 
   n_x_ = 5;
   n_aug_ = 7;
   // sigma point spreading parameter
   lambda_ = 3 - n_x_; // default vaule
+  // initialize weights
+  weights_ = VectorXd(2*n_aug_+1);
+  //set weights
+  weights_(0) = lambda_ / (lambda_ + n_aug_);
+  for (int i = 1; i < 2*n_aug_+1; i++) {
+      weights_(i) = 0.5 * 1 / (lambda_ + n_aug_);
+  }
+  // predicted sigma points matrix
+  Xsig_pred_ = MatrixXd::Zero(n_x_, 2 * n_aug_ + 1);
 }
 
 UKF::~UKF() {}
@@ -150,7 +158,7 @@ void UKF::Prediction(double delta_t) {
   //create augmented state covariance
   MatrixXd P_aug = MatrixXd(7, 7);
   //create sigma point matrix
-  MatrixXd Xsig_aug = MatrixXd(n_aug, 2 * n_aug + 1);
+  MatrixXd Xsig_aug = MatrixXd(n_aug_, 2 * n_aug_ + 1);
   //create augmented mean state
   x_aug.setZero();
   x_aug.head(n_x_) = x_;
@@ -165,9 +173,9 @@ void UKF::Prediction(double delta_t) {
   MatrixXd A = P_aug.llt().matrixL();
   //create augmented sigma points
   Xsig_aug.col(0) = x_aug;
-  for (int i = 0; i < n_aug; i++) {
+  for (int i = 0; i < n_aug_; i++) {
       Xsig_aug.col(i+1) = x_aug + sqrt(lambda_ + n_aug_) * A.col(i);
-      Xsig_aug.col(i+1+n_aug) = x_aug - sqrt(lambda_ + n_aug_) * A.col(i);
+      Xsig_aug.col(i+1+n_aug_) = x_aug - sqrt(lambda_ + n_aug_) * A.col(i);
   }
 
   /*
@@ -175,8 +183,8 @@ void UKF::Prediction(double delta_t) {
   */
 
   //create matrix with predicted sigma points as columns
-  MatrixXd Xsig_pred = MatrixXd(n_x, 2 * n_aug + 1);
-  for (int i = 0; i < 2*n_aug+1; i++) {
+  //MatrixXd Xsig_pred = MatrixXd(n_x_, 2 * n_aug_ + 1);
+  for (int i = 0; i < 2*n_aug_+1; i++) {
       VectorXd current_x = Xsig_aug.col(i);
       double p_x = current_x(0);
       double p_y = current_x(1);
@@ -187,8 +195,8 @@ void UKF::Prediction(double delta_t) {
       double noise_phi = current_x(6);
       
       // a and b are two vectors in the prediction equation
-      VectorXd a = VectorXd::Zero(n_x);
-      VectorXd b = VectorXd::Zero(n_x);
+      VectorXd a = VectorXd::Zero(n_x_);
+      VectorXd b = VectorXd::Zero(n_x_);
       
       if (fabs(phi_dot) < 0.001) {
         a(0) = v*cos(phi)*delta_t;
@@ -206,7 +214,7 @@ void UKF::Prediction(double delta_t) {
       b(3) = 0.5*delta_t*delta_t * noise_phi;
       b(4) = delta_t * noise_phi;
       
-      Xsig_pred.col(i) = Xsig_aug.col(i).head(n_x) + a + b;
+      Xsig_pred_.col(i) = Xsig_aug.col(i).head(n_x_) + a + b;
   }
 
   /*
@@ -214,22 +222,17 @@ void UKF::Prediction(double delta_t) {
   */
  
   //create vector for weights
-  VectorXd weights = VectorXd(2*n_aug+1);
-  int num_points = 2*n_aug+1;
-  //set weights
-  weights(0) = lambda_ / (lambda_ + n_aug_);
-  for (int i = 1; i < num_points; i++) {
-      weights(i) = 0.5 * 1 / (lambda_ + n_aug_);
-  }
+  //VectorXd weights = VectorXd(2*n_aug+1);
+  int num_points = 2*n_aug_+1;
   //predict state mean
   x_.setZero();
   P_.setZero();
   for (int i = 0; i < num_points; i++) {
-      x_ += weights(i) * Xsig_pred.col(i);
+      x_ += weights_(i) * Xsig_pred_.col(i);
   }
   //predict state covariance matrix
   for (int i = 0; i < num_points; i++) {
-      P_ += weights(i) * (Xsig_pred.col(i) - x_) * (Xsig_pred.col(i) - x_).transpose();
+      P_ += weights_(i) * (Xsig_pred_.col(i) - x_) * (Xsig_pred_.col(i) - x_).transpose();
   }
 }
 
@@ -261,43 +264,107 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   You'll also need to calculate the radar NIS.
   */
-}
 
-/**
- * Generate sigma points
- */
-void UKF::GenerateSigmaPoints(MatrixXd* Xsig_out) {
-  //create augmented mean vector
-  VectorXd x_aug = VectorXd(7);
+  //set measurement dimension, radar can measure r, phi, and r_dot
+  int n_z = 3;
 
-  //create augmented state covariance
-  MatrixXd P_aug = MatrixXd(7, 7);
+  //create matrix for sigma points in measurement space
+  MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug + 1);
 
-  //create sigma point matrix
-  MatrixXd Xsig_aug = MatrixXd(n_aug, 2 * n_aug + 1);
-
-  //create augmented mean state
-  x_aug.setZero();
-  x_aug.head(n_x_) = x_;
+  //mean predicted measurement
+  VectorXd z_pred = VectorXd(n_z);
   
-  //create augmented covariance matrix
-  P_aug.setZero();
-  P_aug.topLeftCorner(n_x_, n_x_) = P_;
-  MatrixXd Q = MatrixXd(2, 2);
-  Q << std_a_*std_a_, 0,
-       0, std_yawdd_*std_yawdd_;
-  P_aug.bottomRightCorner(2, 2) = Q;
-  
-  //create square root matrix
-  MatrixXd A = P_aug.llt().matrixL();
-  
-  //create augmented sigma points
-  Xsig_aug.col(0) = x_aug;
-  for (int i = 0; i < n_aug; i++) {
-      Xsig_aug.col(i+1) = x_aug + sqrt(lambda_ + n_aug_) * A.col(i);
-      Xsig_aug.col(i+1+n_aug) = x_aug - sqrt(lambda_ + n_aug_) * A.col(i);
+  //measurement covariance matrix S
+  MatrixXd S = MatrixXd(n_z,n_z);
+
+  //transform sigma points into measurement space
+  for (int i = 0; i < 2*n_aug+1; i++) {
+      float px = Xsig_pred_.col(i)(0); 
+      float py = Xsig_pred_.col(i)(1); 
+      float v = Xsig_pred_.col(i)(2); 
+      float phi = Xsig_pred_.col(i)(3);
+      
+      Zsig.col(i)(0) = sqrt(px*px + py*py);
+      Zsig.col(i)(1) = atan(py/px);
+      Zsig.col(i)(2) = (px*cos(phi)*v + py*sin(phi)*(v)) / sqrt(px*px + py*py);
   }
-  //write result
-  *Xsig_out = Xsig_aug;
+  
+  //calculate mean predicted measurement
+  z_pred.setZero();
+  for (int i = 0; i < 2*n_aug+1; i++) {
+      z_pred += weights_(i) * Zsig.col(i);
+  }
+  
+  //calculate innovation covariance matrix S
+  MatrixXd R = MatrixXd::Zero(3, 3);
+  R(0,0) = std_radr_*std_radr_;
+  R(1,1) = std_radphi_*std_radphi_;
+  R(2,2) = std_radrd_*std_radrd_;
+  
+  S.setZero();
+  for (int i = 0; i < 2*n_aug+1; i++) {
+      VectorXd z_diff = Zsig.col(i) - z_pred;
+      S += weights_(i) * z_diff * z_diff.transpose();
+  } 
+  S += R;
+
+  /*****
+  Update
+  ******/
+
+  //create matrix for cross correlation Tc
+  MatrixXd Tc = MatrixXd(n_x_, n_z);
+  //calculate cross correlation matrix
+  Tc.setZero();
+  for (int i = 0; i < 2 * n_aug + 1; i++) {
+      Tc += weights_(i) * (Xsig_pred_.col(i) - x_) * (Zsig.col(i) - z_pred).transpose();
+  }
+  //std::cout << "cross correlation matrix: " << Tc << std::endl;
+  
+  //calculate Kalman gain K;
+  MatrixXd K = Tc * S.inverse();
+  //create vector for incoming radar measurement
+  VectorXd z = meas_package.raw_measurements_; 
+  //update state mean and covariance matrix
+  x_ = x_ + K * (z - z_pred);
+  P_ = P_ - K*S*K.transpose();
 }
+
+// /**
+//  * Generate sigma points
+//  */
+// void UKF::GenerateSigmaPoints(MatrixXd* Xsig_out) {
+//   //create augmented mean vector
+//   VectorXd x_aug = VectorXd(7);
+
+//   //create augmented state covariance
+//   MatrixXd P_aug = MatrixXd(7, 7);
+
+//   //create sigma point matrix
+//   MatrixXd Xsig_aug = MatrixXd(n_aug, 2 * n_aug + 1);
+
+//   //create augmented mean state
+//   x_aug.setZero();
+//   x_aug.head(n_x_) = x_;
+  
+//   //create augmented covariance matrix
+//   P_aug.setZero();
+//   P_aug.topLeftCorner(n_x_, n_x_) = P_;
+//   MatrixXd Q = MatrixXd(2, 2);
+//   Q << std_a_*std_a_, 0,
+//        0, std_yawdd_*std_yawdd_;
+//   P_aug.bottomRightCorner(2, 2) = Q;
+  
+//   //create square root matrix
+//   MatrixXd A = P_aug.llt().matrixL();
+  
+//   //create augmented sigma points
+//   Xsig_aug.col(0) = x_aug;
+//   for (int i = 0; i < n_aug; i++) {
+//       Xsig_aug.col(i+1) = x_aug + sqrt(lambda_ + n_aug_) * A.col(i);
+//       Xsig_aug.col(i+1+n_aug) = x_aug - sqrt(lambda_ + n_aug_) * A.col(i);
+//   }
+//   //write result
+//   *Xsig_out = Xsig_aug;
+// }
 
