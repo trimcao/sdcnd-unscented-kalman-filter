@@ -29,10 +29,10 @@ UKF::UKF() {
   // P_ = MatrixXd::Identity(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 0.0001; // set this to 3 initially
+  std_a_ = 1.0; // set this to 3 initially
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.0001;
+  std_yawdd_ = 1.0;
   
   //DO NOT MODIFY measurement noise values below these are provided by the sensor manufacturer.
   // Laser measurement noise standard deviation position1 in m
@@ -98,13 +98,17 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     // set the timestamp
     time_us_ = meas_package.timestamp_;
     // initialize x 
+    x_ << 0, 0, 1.0, 0.5, 0;
     if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
-      x_ << meas_package.raw_measurements_(0), meas_package.raw_measurements_(1), 0.01, 0.01, 0.01;
+      // x_ << meas_package.raw_measurements_(0), meas_package.raw_measurements_(1), 0.01, 0.01, 0.01;
+      x_(0) = meas_package.raw_measurements_(0);
+      x_(1) = meas_package.raw_measurements_(1);  
     }
     else if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
       double ro = meas_package.raw_measurements_(0);
       double theta = meas_package.raw_measurements_(1);
-      x_ << ro*cos(theta), ro*sin(theta), 0.01, 0.01, 0.01;
+      x_(0) = ro*cos(theta);
+      x_(1) = ro*sin(theta);
     }
 
     // initialize P
@@ -129,7 +133,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   /*************
   Prediction 
   **************/
-  double delta_t = meas_package.timestamp_ - time_us_;
+  double delta_t = (meas_package.timestamp_ - time_us_) / 1000000.0;
   time_us_ = meas_package.timestamp_;
   Prediction(delta_t);
 
@@ -160,7 +164,7 @@ void UKF::Prediction(double delta_t) {
   /*
   Generate augmented sigma points.
   */
-
+  
   //create augmented mean vector
   VectorXd x_aug = VectorXd(7);
   //create augmented state covariance
@@ -186,7 +190,7 @@ void UKF::Prediction(double delta_t) {
       Xsig_aug.col(i+1+n_aug_) = x_aug - sqrt(lambda_ + n_aug_) * A.col(i);
   }
 
-  std::cout << "Xsig_aug:" << Xsig_aug << std::endl;
+  std::cout << "Xsig_aug:\n" << Xsig_aug << std::endl;
 
   /*
   Predict sigma points.
@@ -226,7 +230,7 @@ void UKF::Prediction(double delta_t) {
       
       Xsig_pred_.col(i) = Xsig_aug.col(i).head(n_x_) + a + b;
   }
-  std::cout << "Xsig_pred:" << Xsig_pred_ << std::endl;
+  std::cout << "Xsig_pred:\n" << Xsig_pred_ << std::endl;
 
   /*
   Calculate mean state and variance 
@@ -246,11 +250,11 @@ void UKF::Prediction(double delta_t) {
       // state difference
       VectorXd x_diff = Xsig_pred_.col(i) - x_;
       //angle normalization
-      //while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
-      //while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
-      if (x_diff(3) > 2*M_PI || x_diff(3) < -2*M_PI)
-        x_diff(3) = fmod(x_diff(3), 2*M_PI);       
-      std::cout << "x_diff:" << x_diff << std::endl;
+      while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
+      while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
+      // if (x_diff(3) > 2*M_PI || x_diff(3) < -2*M_PI)
+        // x_diff(3) = fmod(x_diff(3), 2*M_PI);       
+      // std::cout << "x_diff: " << x_diff << std::endl;
       P_ += weights_(i) * x_diff * x_diff.transpose();
   }
   std::cout << "x_pred:" << x_ << std::endl;
