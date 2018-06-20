@@ -29,10 +29,10 @@ UKF::UKF() {
   // P_ = MatrixXd::Identity(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 3.0; // set this to 3 initially
+  std_a_ = 0.0001; // set this to 3 initially
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 3.0;
+  std_yawdd_ = 0.0001;
   
   //DO NOT MODIFY measurement noise values below these are provided by the sensor manufacturer.
   // Laser measurement noise standard deviation position1 in m
@@ -99,12 +99,12 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     time_us_ = meas_package.timestamp_;
     // initialize x 
     if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
-      x_ << meas_package.raw_measurements_(0), meas_package.raw_measurements_(1), 1, 1, 1;
+      x_ << meas_package.raw_measurements_(0), meas_package.raw_measurements_(1), 0.01, 0.01, 0.01;
     }
     else if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
       double ro = meas_package.raw_measurements_(0);
       double theta = meas_package.raw_measurements_(1);
-      x_ << ro*cos(theta), ro*sin(theta), 1, 1, 1;
+      x_ << ro*cos(theta), ro*sin(theta), 0.01, 0.01, 0.01;
     }
 
     // initialize P
@@ -186,6 +186,8 @@ void UKF::Prediction(double delta_t) {
       Xsig_aug.col(i+1+n_aug_) = x_aug - sqrt(lambda_ + n_aug_) * A.col(i);
   }
 
+  std::cout << "Xsig_aug:" << Xsig_aug << std::endl;
+
   /*
   Predict sigma points.
   */
@@ -224,6 +226,7 @@ void UKF::Prediction(double delta_t) {
       
       Xsig_pred_.col(i) = Xsig_aug.col(i).head(n_x_) + a + b;
   }
+  std::cout << "Xsig_pred:" << Xsig_pred_ << std::endl;
 
   /*
   Calculate mean state and variance 
@@ -247,6 +250,9 @@ void UKF::Prediction(double delta_t) {
       while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
       P_ += weights_(i) * x_diff * x_diff.transpose();
   }
+  std::cout << "x_pred:" << x_ << std::endl;
+  std::cout << "P_pred:" << P_ << std::endl;
+  std::cout << "\n";
 }
 
 /**
