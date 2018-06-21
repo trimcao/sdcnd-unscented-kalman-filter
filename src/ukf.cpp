@@ -29,10 +29,10 @@ UKF::UKF() {
   // P_ = MatrixXd::Identity(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 1.0; // set this to 3 initially
+  std_a_ = 0.1; // set this to 3 initially
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 1.0;
+  std_yawdd_ = 0.1;
   
   //DO NOT MODIFY measurement noise values below these are provided by the sensor manufacturer.
   // Laser measurement noise standard deviation position1 in m
@@ -98,7 +98,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     // set the timestamp
     time_us_ = meas_package.timestamp_;
     // initialize x 
-    x_ << 0, 0, 1.0, 0.5, 0;
+    x_ << 0, 0, 0.1, 0.1, 0;
     if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
       // x_ << meas_package.raw_measurements_(0), meas_package.raw_measurements_(1), 0.01, 0.01, 0.01;
       x_(0) = meas_package.raw_measurements_(0);
@@ -114,9 +114,9 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     // initialize P
     P_ << 1, 0, 0, 0, 0,
           0, 1, 0, 0, 0,
-          0, 0, 1000, 0, 0,
-          0, 0, 0, 1000, 0,
-          0, 0, 0, 0, 1000;
+          0, 0, 1, 0, 0,
+          0, 0, 0, 1, 0,
+          0, 0, 0, 0, 1;
 
     // done initialization
     is_initialized_ = true;
@@ -135,6 +135,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   **************/
   double delta_t = (meas_package.timestamp_ - time_us_) / 1000000.0;
   time_us_ = meas_package.timestamp_;
+  std::cout << "delta_t: " << delta_t << std::endl;
   Prediction(delta_t);
 
   /*************
