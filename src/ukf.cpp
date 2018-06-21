@@ -29,10 +29,10 @@ UKF::UKF() {
   // P_ = MatrixXd::Identity(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 0.1; // set this to 3 initially
+  std_a_ = 0.2; // set this to 3 initially
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.1;
+  std_yawdd_ = 0.5;
   
   //DO NOT MODIFY measurement noise values below these are provided by the sensor manufacturer.
   // Laser measurement noise standard deviation position1 in m
@@ -98,7 +98,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     // set the timestamp
     time_us_ = meas_package.timestamp_;
     // initialize x 
-    x_ << 0, 0, 0.1, 0.1, 0;
+    x_ << 0, 0, 5.0, 0.5, 0.1;
     if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
       // x_ << meas_package.raw_measurements_(0), meas_package.raw_measurements_(1), 0.01, 0.01, 0.01;
       x_(0) = meas_package.raw_measurements_(0);
@@ -112,11 +112,11 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     }
 
     // initialize P
-    P_ << 1, 0, 0, 0, 0,
-          0, 1, 0, 0, 0,
-          0, 0, 1, 0, 0,
-          0, 0, 0, 1, 0,
-          0, 0, 0, 0, 1;
+    P_ << 0.01, 0, 0, 0, 0,
+          0, 0.01, 0, 0, 0,
+          0, 0, 0.01, 0, 0,
+          0, 0, 0, 0.01, 0,
+          0, 0, 0, 0, 0.01;
 
     // done initialization
     is_initialized_ = true;
@@ -126,16 +126,16 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   /*
   Print Debug
   */
-  std::cout << "x:" << x_ << std::endl;
-  std::cout << "P:" << P_ << std::endl;
-  std::cout << "\n";
+//   std::cout << "x:" << x_ << std::endl;
+//   std::cout << "P:" << P_ << std::endl;
+//   std::cout << "\n";
 
   /*************
   Prediction 
   **************/
   double delta_t = (meas_package.timestamp_ - time_us_) / 1000000.0;
   time_us_ = meas_package.timestamp_;
-  std::cout << "delta_t: " << delta_t << std::endl;
+//   std::cout << "delta_t: " << delta_t << std::endl;
   Prediction(delta_t);
 
   /*************
@@ -191,7 +191,7 @@ void UKF::Prediction(double delta_t) {
       Xsig_aug.col(i+1+n_aug_) = x_aug - sqrt(lambda_ + n_aug_) * A.col(i);
   }
 
-  std::cout << "Xsig_aug:\n" << Xsig_aug << std::endl;
+//   std::cout << "Xsig_aug:\n" << Xsig_aug << std::endl;
 
   /*
   Predict sigma points.
@@ -231,7 +231,7 @@ void UKF::Prediction(double delta_t) {
       
       Xsig_pred_.col(i) = Xsig_aug.col(i).head(n_x_) + a + b;
   }
-  std::cout << "Xsig_pred:\n" << Xsig_pred_ << std::endl;
+//   std::cout << "Xsig_pred:\n" << Xsig_pred_ << std::endl;
 
   /*
   Calculate mean state and variance 
@@ -258,9 +258,9 @@ void UKF::Prediction(double delta_t) {
       // std::cout << "x_diff: " << x_diff << std::endl;
       P_ += weights_(i) * x_diff * x_diff.transpose();
   }
-  std::cout << "x_pred:" << x_ << std::endl;
-  std::cout << "P_pred:" << P_ << std::endl;
-  std::cout << "\n";
+//   std::cout << "x_pred:" << x_ << std::endl;
+//   std::cout << "P_pred:" << P_ << std::endl;
+//   std::cout << "\n";
 }
 
 /**
@@ -371,7 +371,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
       float phi = Xsig_pred_.col(i)(3);
       
       Zsig.col(i)(0) = sqrt(px*px + py*py);
-      Zsig.col(i)(1) = atan(py/px);
+      Zsig.col(i)(1) = atan2(py, px);
       Zsig.col(i)(2) = (px*cos(phi)*v + py*sin(phi)*(v)) / sqrt(px*px + py*py);
   }
   
