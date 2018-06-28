@@ -100,7 +100,6 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     // initialize x 
     x_ << 0, 0, 5.0, 0.5, 0.1;
     if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
-      // x_ << meas_package.raw_measurements_(0), meas_package.raw_measurements_(1), 0.01, 0.01, 0.01;
       x_(0) = meas_package.raw_measurements_(0);
       x_(1) = meas_package.raw_measurements_(1);  
     }
@@ -126,16 +125,16 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   /*
   Print Debug
   */
-//   std::cout << "x:" << x_ << std::endl;
-//   std::cout << "P:" << P_ << std::endl;
-//   std::cout << "\n";
+  //std::cout << "x:" << x_ << std::endl;
+  //std::cout << "P:" << P_ << std::endl;
+  //std::cout << "\n";
 
   /*************
   Prediction 
   **************/
   double delta_t = (meas_package.timestamp_ - time_us_) / 1000000.0;
   time_us_ = meas_package.timestamp_;
-//   std::cout << "delta_t: " << delta_t << std::endl;
+  //std::cout << "delta_t: " << delta_t << std::endl;
   Prediction(delta_t);
 
   /*************
@@ -191,7 +190,7 @@ void UKF::Prediction(double delta_t) {
       Xsig_aug.col(i+1+n_aug_) = x_aug - sqrt(lambda_ + n_aug_) * A.col(i);
   }
 
-//   std::cout << "Xsig_aug:\n" << Xsig_aug << std::endl;
+  //std::cout << "Xsig_aug:\n" << Xsig_aug << std::endl;
 
   /*
   Predict sigma points.
@@ -231,7 +230,7 @@ void UKF::Prediction(double delta_t) {
       
       Xsig_pred_.col(i) = Xsig_aug.col(i).head(n_x_) + a + b;
   }
-//   std::cout << "Xsig_pred:\n" << Xsig_pred_ << std::endl;
+  //std::cout << "Xsig_pred:\n" << Xsig_pred_ << std::endl;
 
   /*
   Calculate mean state and variance 
